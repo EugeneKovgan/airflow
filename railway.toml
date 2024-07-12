@@ -1,7 +1,0 @@
-[build]
-commands = [
-  "pip install -r requirements.txt"
-]
-
-[start]
-web = "sh start.sh"
