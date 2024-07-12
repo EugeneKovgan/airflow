@@ -10,4 +10,4 @@ airflow users create --username admin --firstname Admin --lastname User --role A
 airflow scheduler &
 
 # Start the web server
-exec airflow webserver -p 8080
+exec airflow webserver -p $PORT
