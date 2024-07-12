@@ -1,5 +1,5 @@
 from airflow import DAG
-from airflow.operators.dummy_operator import DummyOperator # type: ignore
+from airflow.operators.empty import EmptyOperator
 from datetime import datetime
 
 default_args = {
