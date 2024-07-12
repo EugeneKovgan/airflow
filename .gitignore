@@ -1,2 +1,15 @@
 # Ignore virtual environment
 airflow_venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+instance/
+.webassets-cache
+*.log
+logs/
+.env
+.venv
+*.sqlite
+*.swp
