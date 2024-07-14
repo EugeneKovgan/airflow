@@ -1,2 +1,2 @@
-apache-airflow==2.3.0
-psycopg2-binary
+pymongo
+apache-airflow-providers-mongo
