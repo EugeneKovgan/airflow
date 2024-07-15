@@ -1,11 +1,17 @@
-FROM apache/airflow:2.6.3
+FROM apache/airflow:2.6.3-python3.8
 
+ENV AIRFLOW_HOME=/opt/airflow
+
+# Установим зависимости
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY dags /opt/airflow/dags
+# Скопируем все необходимые файлы
+COPY dags/ $AIRFLOW_HOME/dags/
+# COPY core/ $AIRFLOW_HOME/core/
+COPY .env $AIRFLOW_HOME/
 
-ENV AIRFLOW__CORE__EXECUTOR=LocalExecutor
-ENV AIRFLOW__CORE__SQL_ALCHEMY_CONN=${AIRFLOW__CORE__SQL_ALCHEMY_CONN}
+# Установим переменную PYTHONPATH, включающую директорию core
+ENV PYTHONPATH "${PYTHONPATH}:/opt/airflow/core"
 
-CMD ["airflow", "webserver"]
+USER airflow

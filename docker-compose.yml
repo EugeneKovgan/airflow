@@ -8,38 +8,67 @@ services:
       POSTGRES_DB: airflow
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - airflow_network
+
+  mongodb:
+    image: mongo:4.4
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - airflow_network
 
   webserver:
     build: .
     environment:
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: ${AIRFLOW__CORE__SQL_ALCHEMY_CONN}
-      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW__WEBSERVER__SECRET_KEY}
-      AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL: '30'
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=${AIRFLOW__CORE__SQL_ALCHEMY_CONN}
+      - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW__WEBSERVER__SECRET_KEY}
+      - AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL=30
+      - REMOTE_MONGO_URI=${REMOTE_MONGO_URI}
+      - REMOTE_MONGO_DB=${REMOTE_MONGO_DB}
+      - LOCAL_MONGO_URI=${LOCAL_MONGO_URI}
+      - LOCAL_MONGO_DB=${LOCAL_MONGO_DB}
     ports:
       - "8080:8080"
     depends_on:
       - postgres
+      - mongodb
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
     command: bash -c "airflow db init && airflow users create --username admin --password admin --firstname admin --lastname admin --role Admin --email admin@example.com && airflow webserver"
+    networks:
+      - airflow_network
 
   scheduler:
     build: .
     environment:
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: ${AIRFLOW__CORE__SQL_ALCHEMY_CONN}
-      AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL: '30'
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=${AIRFLOW__CORE__SQL_ALCHEMY_CONN}
+      - AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL=30
+      - REMOTE_MONGO_URI=${REMOTE_MONGO_URI}
+      - REMOTE_MONGO_DB=${REMOTE_MONGO_DB}
+      - LOCAL_MONGO_URI=${LOCAL_MONGO_URI}
+      - LOCAL_MONGO_DB=${LOCAL_MONGO_DB}
     depends_on:
       - postgres
       - webserver
+      - mongodb
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
     command: bash -c "airflow scheduler"
+    networks:
+      - airflow_network
+
+networks:
+  airflow_network:
 
 volumes:
   postgres_data:
+  mongo_data:
