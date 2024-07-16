@@ -11,15 +11,6 @@ services:
     networks:
       - airflow_network
 
-  mongodb:
-    image: mongo:4.4
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo_data:/data/db
-    networks:
-      - airflow_network
-
   webserver:
     build: .
     environment:
@@ -29,13 +20,10 @@ services:
       - AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL=30
       - REMOTE_MONGO_URI=${REMOTE_MONGO_URI}
       - REMOTE_MONGO_DB=${REMOTE_MONGO_DB}
-      - LOCAL_MONGO_URI=${LOCAL_MONGO_URI}
-      - LOCAL_MONGO_DB=${LOCAL_MONGO_DB}
     ports:
       - "8080:8080"
     depends_on:
       - postgres
-      - mongodb
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
@@ -52,12 +40,9 @@ services:
       - AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL=30
       - REMOTE_MONGO_URI=${REMOTE_MONGO_URI}
       - REMOTE_MONGO_DB=${REMOTE_MONGO_DB}
-      - LOCAL_MONGO_URI=${LOCAL_MONGO_URI}
-      - LOCAL_MONGO_DB=${LOCAL_MONGO_DB}
     depends_on:
       - postgres
       - webserver
-      - mongodb
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
@@ -71,4 +56,3 @@ networks:
 
 volumes:
   postgres_data:
-  mongo_data:
