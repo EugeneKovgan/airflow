@@ -18,8 +18,10 @@ services:
       - AIRFLOW__CORE__SQL_ALCHEMY_CONN=${AIRFLOW__CORE__SQL_ALCHEMY_CONN}
       - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW__WEBSERVER__SECRET_KEY}
       - AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL=30
-      - REMOTE_MONGO_URI=${REMOTE_MONGO_URI}
-      - REMOTE_MONGO_DB=${REMOTE_MONGO_DB}
+      - MONGO_URL=${MONGO_URL}
+      - MONGO_DBNAME=${MONGO_DBNAME}
+      - TIKAPI_KEY=${TIKAPI_KEY}
+      - TIKAPI_AUTHKEY=${TIKAPI_AUTHKEY}
     ports:
       - "8080:8080"
     depends_on:
@@ -28,6 +30,7 @@ services:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
+      - ./.env:/opt/airflow/.env
     command: bash -c "airflow db init && airflow users create --username admin --password admin --firstname admin --lastname admin --role Admin --email admin@example.com && airflow webserver"
     networks:
       - airflow_network
@@ -38,8 +41,10 @@ services:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__CORE__SQL_ALCHEMY_CONN=${AIRFLOW__CORE__SQL_ALCHEMY_CONN}
       - AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL=30
-      - REMOTE_MONGO_URI=${REMOTE_MONGO_URI}
-      - REMOTE_MONGO_DB=${REMOTE_MONGO_DB}
+      - MONGO_URL=${MONGO_URL}
+      - MONGO_DBNAME=${MONGO_DBNAME}
+      - TIKAPI_KEY=${TIKAPI_KEY}
+      - TIKAPI_AUTHKEY=${TIKAPI_AUTHKEY}
     depends_on:
       - postgres
       - webserver
@@ -47,6 +52,7 @@ services:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
+      - ./.env:/opt/airflow/.env
     command: bash -c "airflow scheduler"
     networks:
       - airflow_network

@@ -101,14 +101,14 @@ def transform_to_unified_schema(document, platform):
         }
 
 def extract_and_combine(**kwargs):
-    remote_mongo_uri = os.getenv("REMOTE_MONGO_URI")
-    remote_mongo_db = os.getenv("REMOTE_MONGO_DB")
+    mongo_uri = os.getenv("MONGO_URL")
+    mongo_db = os.getenv("MONGO_DBNAME")
 
-    print(f"REMOTE_MONGO_URI: {remote_mongo_uri}")
-    print(f"REMOTE_MONGO_DB: {remote_mongo_db}")
+    print(f"MONGO_URL: {mongo_uri}")
+    print(f"MONGO_DBNAME: {mongo_db}")
 
-    remote_client = MongoClient(remote_mongo_uri)
-    remote_db = remote_client[remote_mongo_db]
+    remote_client = MongoClient(mongo_uri)
+    remote_db = remote_client[mongo_db]
 
     tiktok_posts = list(remote_db.tiktok_posts.find())
     instagram_reels = list(remote_db.instagram_reels.find())
