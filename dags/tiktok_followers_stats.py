@@ -1,35 +1,12 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
-from pymongo import MongoClient
-import os
-from tikapi import TikAPI
-
-def fetch_tiktok_followers_data():
-    api_key = os.getenv("TIKAPI_KEY")
-    auth_key = os.getenv("TIKAPI_AUTHKEY")
-    api = TikAPI(api_key)
-    user = api.user(accountKey=auth_key)
-    try:
-        data = user.analytics(type="followers")
-        return data.json()
-    except Exception as e:
-        print(f"Error fetching data: {str(e)}")
-        raise
+from common.common_functions import fetch_tiktok_followers_data, save_data_to_mongo
 
 def save_followers_data(**kwargs):
-    mongo_url = os.getenv("MONGO_URL")
-    mongo_dbname = os.getenv("MONGO_DBNAME")
-    client = MongoClient(mongo_url)
-    db = client[mongo_dbname]
-    
     data = fetch_tiktok_followers_data()
     if data:
-        db.tiktok_followers_test.insert_one({
-            "data": data,
-            "recordCreated": kwargs['ts']
-        })
-    client.close()
+        save_data_to_mongo('tiktok_followers_test', data, kwargs['ts'])
 
 default_args = {
     'owner': 'airflow',

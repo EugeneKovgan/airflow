@@ -1,8 +1,8 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
-from pymongo import MongoClient, UpdateOne
-import os
+from pymongo import UpdateOne
+from common.common_functions import get_mongo_client
 
 def transform_to_unified_schema(document, platform):
     video = document.get("video", {})
@@ -101,18 +101,11 @@ def transform_to_unified_schema(document, platform):
         }
 
 def extract_and_combine(**kwargs):
-    mongo_uri = os.getenv("MONGO_URL")
-    mongo_db = os.getenv("MONGO_DBNAME")
+    db = get_mongo_client()
 
-    print(f"MONGO_URL: {mongo_uri}")
-    print(f"MONGO_DBNAME: {mongo_db}")
-
-    remote_client = MongoClient(mongo_uri)
-    remote_db = remote_client[mongo_db]
-
-    tiktok_posts = list(remote_db.tiktok_posts.find())
-    instagram_reels = list(remote_db.instagram_reels.find())
-    youtube_videos = list(remote_db.youtube_videos.find())
+    tiktok_posts = list(db.tiktok_posts.find())
+    instagram_reels = list(db.instagram_reels.find())
+    youtube_videos = list(db.youtube_videos.find())
 
     combined_data = []
     for post in tiktok_posts:
@@ -137,7 +130,7 @@ def extract_and_combine(**kwargs):
         ))
 
     if operations:
-        remote_db.combined_videos.bulk_write(operations, ordered=False)
+        db.combined_videos.bulk_write(operations, ordered=False)
 
     print("Data combined and saved to new collection in remote MongoDB")
 
