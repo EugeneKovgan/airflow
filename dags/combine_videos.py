@@ -1,106 +1,13 @@
+# dags/combine_videos.py
+
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
 from pymongo import UpdateOne
-from common.common_functions import get_mongo_client
+from common.common_functions import get_mongo_client, combine_videos_object
+from typing import Any, Dict
 
-def transform_to_unified_schema(document, platform):
-    video = document.get("video", {})
-    if platform == "tiktok":
-        stats = video.get("stats", {})
-        return {
-            "_id": document.get("_id"),
-            "recordCreated": document.get("recordCreated"),
-            "tags": document.get("tags"),
-            "platform": platform,
-            "video": {
-                "author": video.get("author", {}).get("nickname"),
-                "created_at": video.get("createTime"),
-                "description": video.get("desc"),
-                "id": video.get("id"),
-                'duration': video.get("music", {}).get("duration"),
-                "video_url": video.get("video", {}).get("cover"),
-                "stats": {
-                    "collectCount": stats.get("collectCount"),
-                    "commentCount": stats.get("commentCount"),
-                    "diggCount": stats.get("diggCount"),
-                    "playCount": stats.get("playCount"),
-                    "shareCount": stats.get("shareCount"),
-                    "followers_count": None,
-                }
-            }
-        }
-    elif platform == "instagram":
-        return {
-            "_id": document.get("_id"),
-            "recordCreated": document.get("recordCreated"),
-            "tags": document.get("tags"),
-            "platform": platform,
-            "video": {
-                "author": video.get("author_name"),  
-                "created_at": video.get("createTime"),
-                "description": video.get("desc"),
-                "id": video.get("id"),
-                'duration': None,
-                "video_url": video.get("cover"),
-                "stats": {
-                    "collectCount": None,
-                    "commentCount": video.get("comment_count"),
-                    "diggCount": video.get("like_count"),
-                    "playCount": None,
-                    "shareCount": None,
-                    "followers_count":  video.get("profile_picture_url", {}).get("followers_count"),
-                }
-            }
-        }
-    elif platform == "youtube":
-        return {
-            "_id": document.get("_id"),
-            "recordCreated": document.get("recordCreated"),
-            "tags": document.get("tags"),
-            "platform": platform,
-            "video": {
-                "author": video.get("author"),
-                "created_at": video.get("createTime"),
-                "description": video.get("desc"),
-                "id": video.get("id"),
-                'duration': None,
-                "video_url": video.get("url"),
-                "stats": {
-                    "collectCount": None,
-                    "commentCount": None,
-                    "diggCount": None,
-                    "playCount": None,
-                    "shareCount": None,
-                    "followers_count": None,
-                }
-            }
-        }
-    else:
-        return {
-            "_id": document.get("_id"),
-            "recordCreated": document.get("recordCreated"),
-            "tags": document.get("tags"),
-            "platform": platform,
-            "video": {
-                "author": None,
-                "created_at": None,
-                "description": None,
-                "id": video.get("id"),
-                'duration': None,
-                "video_url": None,
-                "stats": {
-                    "collectCount": None,
-                    "commentCount": None,
-                    "diggCount": None,
-                    "playCount": None,
-                    "shareCount": None,
-                    "followers_count": None,
-                }
-            }
-        }
-
-def extract_and_combine(**kwargs):
+def extract_and_combine(**kwargs: Dict[str, Any]) -> None:
     db = get_mongo_client()
 
     tiktok_posts = list(db.tiktok_posts.find())
@@ -108,16 +15,17 @@ def extract_and_combine(**kwargs):
     youtube_videos = list(db.youtube_videos.find())
 
     combined_data = []
+
     for post in tiktok_posts:
-        transformed_post = transform_to_unified_schema(post, "tiktok")
+        transformed_post = combine_videos_object(post, "tiktok")
         combined_data.append(transformed_post)
     
     for reel in instagram_reels:
-        transformed_reel = transform_to_unified_schema(reel, "instagram")
+        transformed_reel = combine_videos_object(reel, "instagram")
         combined_data.append(transformed_reel)
     
     for video in youtube_videos:
-        transformed_video = transform_to_unified_schema(video, "youtube")
+        transformed_video = combine_videos_object(video, "youtube")
         combined_data.append(transformed_video)
 
     operations = []

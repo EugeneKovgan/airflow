@@ -1,9 +1,12 @@
+# dags/tiktok_followers_stats.py
+
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
 from common.common_functions import fetch_tiktok_followers_data, save_data_to_mongo
+from typing import Any, Dict
 
-def save_followers_data(**kwargs):
+def save_followers_data(**kwargs: Dict[str, Any]) -> None:
     data = fetch_tiktok_followers_data()
     if data:
         save_data_to_mongo('tiktok_followers_test', data, kwargs['ts'])
