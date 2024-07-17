@@ -1,7 +1,7 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
-from common.common_functions import get_tikapi_client, save_data_to_mongo, save_parser_history, get_mongo_client
+from common.common_functions import save_parser_history, get_mongo_client, get_tikapi_client
 from typing import Any, Dict
 import pendulum
 
@@ -14,8 +14,15 @@ def fetch_tiktok_followers_data() -> Dict[str, Any]:
         print(f"Error fetching data: {str(e)}")
         raise
 
+def save_data_to_mongo(collection_name: str, data: Dict[str, Any], ts: str) -> None:
+    db = get_mongo_client()
+    db[collection_name].insert_one({
+        "data": data,
+        "recordCreated": ts
+    })
+
 def save_followers_data(**kwargs: Dict[str, Any]) -> None:
-    parser_name = 'TikTok Followers'
+    parser_name = 'Fetch TikTok Followers Data'
     status = 'success'
     start_time = pendulum.now()
     total_followers = 0
@@ -23,9 +30,12 @@ def save_followers_data(**kwargs: Dict[str, Any]) -> None:
     try:
         db = get_mongo_client()
         data = fetch_tiktok_followers_data()
+        ts = kwargs['ts']  
+        if not isinstance(ts, str):
+            raise ValueError("Timestamp 'ts' must be a string")
         if data:
-            save_data_to_mongo('tiktok_followers_test', data, kwargs['ts'])
-            total_followers = len(data)  # Example count, adjust as needed
+            save_data_to_mongo('tiktok_followers_test', data, ts)
+            total_followers = len(data)  
 
     except Exception as error:
         status = 'failure'

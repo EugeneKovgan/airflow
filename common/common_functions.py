@@ -8,6 +8,8 @@ from tikapi import TikAPI
 from typing import Any, Dict
 from dataclasses import asdict
 from common.schemas import Document, Video, VideoStats
+import logging
+logger = logging.getLogger("airflow")
 
 def get_mongo_client() -> MongoClient:
     mongo_url = os.getenv("MONGO_URL")
@@ -21,15 +23,6 @@ def get_tikapi_client() -> TikAPI:
     auth_key = os.getenv("TIKAPI_AUTHKEY")
     api = TikAPI(api_key)
     return api.user(accountKey=auth_key)
-
-# def fetch_tiktok_followers_data() -> Dict[str, Any]:
-#     user = get_tikapi_client()
-#     try:
-#         data = user.analytics(type="followers")
-#         return data.json()
-#     except Exception as e:
-#         print(f"Error fetching data: {str(e)}")
-#         raise
 
 def save_data_to_mongo(collection_name: str, data: Dict[str, Any], ts: str) -> None:
     db = get_mongo_client()
@@ -81,3 +74,76 @@ def combine_videos_object(document: Dict[str, Any], platform: str) -> Dict[str, 
             )
         )
     ))
+
+def close_mongo_connection(mongo_client):
+    try:
+        mongo_client.close()
+    except Exception as error:
+        print(f"Failed to close MongoDB connection: {error}")
+        logger.error(f"Failed to close MongoDB connection: {error}")
+
+def log_parser_start(parser_name):
+    print(f"{parser_name}: Started: {pendulum.now().to_iso8601_string()}")
+    logger.info(f"{parser_name}: Started: {pendulum.now().to_iso8601_string()}")
+
+def log_parser_finish(parser_name):
+    end_time = pendulum.now()
+    print(f"{parser_name}: Finished: {end_time.to_iso8601_string()}")
+    logger.info(f"{parser_name}: Finished: {end_time.to_iso8601_string()}")
+
+def handle_parser_error(error: Any, parser_name: str, proceed: bool) -> Dict[str, Any]:
+    status = 'success'
+    short_message = ''
+
+    if is_rate_limit_error(error):
+        status = 'Rate limit reached'
+        short_message = 'Error: rate_limit'
+        print('Rate-Limit reached. Terminating function.')
+        proceed = False
+    elif is_quota_exceeded_error(error):
+        status = 'Quota exceeded'
+        short_message = 'Error: quota_exceeded'
+        print('Quota exceeded. Terminating function.')
+        proceed = False
+    elif is_forbidden_error(error):
+        print('Forbidden request. Terminating function. Details:', str(error))
+        log_error_details(error)
+        status = 'Forbidden request'
+        short_message = 'Error: forbidden'
+        proceed = False
+    elif is_invalid_grant_error(error):
+        status = 'Invalid grant'
+        short_message = 'Error: invalid_grant'
+        print('Invalid grant. Terminating function. Details:', str(error))
+        log_error_details(error)
+        proceed = False
+    elif is_undefined_property_error(error):
+        print('Cannot read properties of undefined. Continuing function. Details:', str(error))
+        log_error_details(error)
+        proceed = True
+    else:
+        short_message = f"Error: {error}"
+        log_error_details(error)
+        print(f"{parser_name}: Error: {error}")
+        logger.error(f"{parser_name}: Error: {error}")
+        proceed = False
+
+    return {"status": 'success' if proceed else short_message, "proceed": proceed}
+
+def is_rate_limit_error(error: Any) -> bool:
+    return 'rate_limit' in str(error)
+
+def is_forbidden_error(error: Any) -> bool:
+    return 'FORBIDDEN' in str(error)
+
+def is_invalid_grant_error(error: Any) -> bool:
+    return 'invalid_grant' in str(error)
+
+def is_undefined_property_error(error: Any) -> bool:
+    return 'Cannot read properties of undefined' in str(error)
+
+def is_quota_exceeded_error(error: Any) -> bool:
+    return 'quota' in str(error)
+
+def log_error_details(error: Any) -> None:
+    print(f"Error details: {str(error)}")
