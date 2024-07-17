@@ -1,46 +1,58 @@
-# dags/combine_videos.py
-
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
 from pymongo import UpdateOne
-from common.common_functions import get_mongo_client, combine_videos_object
+from common.common_functions import get_mongo_client, combine_videos_object, save_parser_history
 from typing import Any, Dict
+import pendulum
 
 def extract_and_combine(**kwargs: Dict[str, Any]) -> None:
-    db = get_mongo_client()
+    parser_name = 'Combine Videos'
+    status = 'success'
+    start_time = pendulum.now()
+    total_videos = 0
 
-    tiktok_posts = list(db.tiktok_posts.find())
-    instagram_reels = list(db.instagram_reels.find())
-    youtube_videos = list(db.youtube_videos.find())
+    try:
+        db = get_mongo_client()
 
-    combined_data = []
+        tiktok_posts = list(db.tiktok_posts.find())
+        instagram_reels = list(db.instagram_reels.find())
+        youtube_videos = list(db.youtube_videos.find())
 
-    for post in tiktok_posts:
-        transformed_post = combine_videos_object(post, "tiktok")
-        combined_data.append(transformed_post)
-    
-    for reel in instagram_reels:
-        transformed_reel = combine_videos_object(reel, "instagram")
-        combined_data.append(transformed_reel)
-    
-    for video in youtube_videos:
-        transformed_video = combine_videos_object(video, "youtube")
-        combined_data.append(transformed_video)
+        combined_data = []
 
-    operations = []
-    for document in combined_data:
-        print(f"Document to upsert: {document}")
-        operations.append(UpdateOne(
-            {'_id': document['_id']},
-            {'$set': document},
-            upsert=True
-        ))
+        for post in tiktok_posts:
+            transformed_post = combine_videos_object(post, "tiktok")
+            combined_data.append(transformed_post)
+        
+        for reel in instagram_reels:
+            transformed_reel = combine_videos_object(reel, "instagram")
+            combined_data.append(transformed_reel)
+        
+        for video in youtube_videos:
+            transformed_video = combine_videos_object(video, "youtube")
+            combined_data.append(transformed_video)
 
-    if operations:
-        db.combined_videos.bulk_write(operations, ordered=False)
+        operations = []
+        for document in combined_data:
+            print(f"Document to upsert: {document}")
+            operations.append(UpdateOne(
+                {'_id': document['_id']},
+                {'$set': document},
+                upsert=True
+            ))
 
-    print("Data combined and saved to new collection in remote MongoDB")
+        if operations:
+            db.combined_videos.bulk_write(operations, ordered=False)
+            total_videos = len(operations)
+
+        print("Data combined and saved to new collection in remote MongoDB")
+    except Exception as error:
+        status = 'failure'
+        print(f"Error during processing: {str(error)}")
+        raise
+    finally:
+        save_parser_history(db, parser_name, start_time, 'videos', total_videos, status)
 
 default_args = {
     'owner': 'airflow',

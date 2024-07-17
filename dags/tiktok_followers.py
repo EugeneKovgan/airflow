@@ -1,15 +1,38 @@
-# dags/tiktok_followers.py
-
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
-from common.common_functions import fetch_tiktok_followers_data, save_data_to_mongo
+from common.common_functions import get_tikapi_client, save_data_to_mongo, save_parser_history, get_mongo_client
 from typing import Any, Dict
+import pendulum
+
+def fetch_tiktok_followers_data() -> Dict[str, Any]:
+    user = get_tikapi_client()
+    try:
+        data = user.analytics(type="followers")
+        return data.json()
+    except Exception as e:
+        print(f"Error fetching data: {str(e)}")
+        raise
 
 def save_followers_data(**kwargs: Dict[str, Any]) -> None:
-    data = fetch_tiktok_followers_data()
-    if data:
-        save_data_to_mongo('tiktok_followers_test', data, kwargs['ts'])
+    parser_name = 'TikTok Followers'
+    status = 'success'
+    start_time = pendulum.now()
+    total_followers = 0
+
+    try:
+        db = get_mongo_client()
+        data = fetch_tiktok_followers_data()
+        if data:
+            save_data_to_mongo('tiktok_followers_test', data, kwargs['ts'])
+            total_followers = len(data)  # Example count, adjust as needed
+
+    except Exception as error:
+        status = 'failure'
+        print(f"Error during processing: {str(error)}")
+        raise
+    finally:
+        save_parser_history(db, parser_name, start_time, 'followers', total_followers, status)
 
 default_args = {
     'owner': 'airflow',

@@ -3,6 +3,7 @@
 from datetime import datetime
 from pymongo import MongoClient
 import os
+import pendulum
 from tikapi import TikAPI
 from typing import Any, Dict
 from dataclasses import asdict
@@ -21,14 +22,14 @@ def get_tikapi_client() -> TikAPI:
     api = TikAPI(api_key)
     return api.user(accountKey=auth_key)
 
-def fetch_tiktok_followers_data() -> Dict[str, Any]:
-    user = get_tikapi_client()
-    try:
-        data = user.analytics(type="followers")
-        return data.json()
-    except Exception as e:
-        print(f"Error fetching data: {str(e)}")
-        raise
+# def fetch_tiktok_followers_data() -> Dict[str, Any]:
+#     user = get_tikapi_client()
+#     try:
+#         data = user.analytics(type="followers")
+#         return data.json()
+#     except Exception as e:
+#         print(f"Error fetching data: {str(e)}")
+#         raise
 
 def save_data_to_mongo(collection_name: str, data: Dict[str, Any], ts: str) -> None:
     db = get_mongo_client()
@@ -36,6 +37,13 @@ def save_data_to_mongo(collection_name: str, data: Dict[str, Any], ts: str) -> N
         "data": data,
         "recordCreated": ts
     })
+    
+def parse_datetime(datetime_str):
+    if isinstance(datetime_str, str):
+        return pendulum.parse(datetime_str)
+    elif isinstance(datetime_str, datetime):
+        return pendulum.instance(datetime_str)
+    return None
 
 def save_parser_history(db, parser_name, start_time, data_type, total_count, status):
     db.parser_history_test.insert_one({
@@ -46,9 +54,6 @@ def save_parser_history(db, parser_name, start_time, data_type, total_count, sta
         "total_count": total_count,
         "status": status
     })
-
-def close_mongo_connection(client):
-    client.close()   
 
 def combine_videos_object(document: Dict[str, Any], platform: str) -> Dict[str, Any]:
     video = document.get("video", {})
