@@ -1,5 +1,6 @@
 # common/common_functions.py
 
+from datetime import datetime
 from pymongo import MongoClient
 import os
 from tikapi import TikAPI
@@ -35,6 +36,19 @@ def save_data_to_mongo(collection_name: str, data: Dict[str, Any], ts: str) -> N
         "data": data,
         "recordCreated": ts
     })
+
+def save_parser_history(db, parser_name, start_time, data_type, total_count, status):
+    db.parser_history_test.insert_one({
+        "parser_name": parser_name,
+        "start_time": start_time,
+        "end_time": datetime.utcnow(),
+        "data_type": data_type,
+        "total_count": total_count,
+        "status": status
+    })
+
+def close_mongo_connection(client):
+    client.close()   
 
 def combine_videos_object(document: Dict[str, Any], platform: str) -> Dict[str, Any]:
     video = document.get("video", {})

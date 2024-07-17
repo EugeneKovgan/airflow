@@ -1,4 +1,4 @@
-# dags/tiktok_followers_stats.py
+# dags/tiktok_followers.py
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator
@@ -19,7 +19,7 @@ default_args = {
 }
 
 dag = DAG(
-    'tiktok_followers_stats',
+    'tiktok_followers',
     default_args=default_args,
     description='Fetch TikTok followers stats and save to MongoDB',
     schedule_interval=None,
@@ -27,7 +27,7 @@ dag = DAG(
 )
 
 tiktok_followers_task = PythonOperator(
-    task_id='tiktok_followers_stats',
+    task_id='tiktok_followers',
     python_callable=save_followers_data,
     provide_context=True,
     dag=dag,

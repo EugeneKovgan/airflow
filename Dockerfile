@@ -4,7 +4,7 @@ ENV AIRFLOW_HOME=/opt/airflow
 
 # Install dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 
 # Copy necessary files
 COPY dags/ $AIRFLOW_HOME/dags/
