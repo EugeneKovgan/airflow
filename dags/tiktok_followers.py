@@ -22,7 +22,7 @@ def save_data_to_mongo(collection_name: str, data: Dict[str, Any], ts: str) -> N
     })
 
 def save_followers_data(**kwargs: Dict[str, Any]) -> None:
-    parser_name = 'Fetch TikTok Followers Data'
+    parser_name = 'TikTok Followers Data'
     status = 'success'
     start_time = pendulum.now()
     total_followers = 0
@@ -34,7 +34,7 @@ def save_followers_data(**kwargs: Dict[str, Any]) -> None:
         if not isinstance(ts, str):
             raise ValueError("Timestamp 'ts' must be a string")
         if data:
-            save_data_to_mongo('tiktok_followers_test', data, ts)
+            save_data_to_mongo('tiktok_followers', data, ts)
             total_followers = len(data)  
 
     except Exception as error:

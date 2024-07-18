@@ -39,7 +39,7 @@ def parse_datetime(datetime_str):
     return None
 
 def save_parser_history(db, parser_name, start_time, data_type, total_count, status):
-    db.parser_history_test.insert_one({
+    db.parser_history.insert_one({
         "parser_name": parser_name,
         "start_time": start_time,
         "end_time": datetime.utcnow(),
@@ -91,44 +91,66 @@ def log_parser_finish(parser_name):
     print(f"{parser_name}: Finished: {end_time.to_iso8601_string()}")
     logger.info(f"{parser_name}: Finished: {end_time.to_iso8601_string()}")
 
-def handle_parser_error(error: Any, parser_name: str, proceed: bool) -> Dict[str, Any]:
+error_retry_counters = {}
+
+def handle_parser_error(func, error, parser_name, proceed, retries=3):
+    global error_retry_counters
     status = 'success'
     short_message = ''
 
-    if is_rate_limit_error(error):
+    # Initialize retry counter if not already present
+    if parser_name not in error_retry_counters:
+        error_retry_counters[parser_name] = retries
+
+    error_message = str(error)
+
+    if 'rate_limit' in error_message:
         status = 'Rate limit reached'
         short_message = 'Error: rate_limit'
-        print('Rate-Limit reached. Terminating function.')
+        logging.error('Rate-Limit reached. Terminating function.')
         proceed = False
-    elif is_quota_exceeded_error(error):
+    elif 'quota' in error_message:
         status = 'Quota exceeded'
         short_message = 'Error: quota_exceeded'
-        print('Quota exceeded. Terminating function.')
+        logging.error('Quota exceeded. Terminating function.')
         proceed = False
-    elif is_forbidden_error(error):
-        print('Forbidden request. Terminating function. Details:', str(error))
-        log_error_details(error)
-        status = 'Forbidden request'
-        short_message = 'Error: forbidden'
-        proceed = False
-    elif is_invalid_grant_error(error):
+    elif '403' in error_message or 'FORBIDDEN' in error_message:
+        if 'commentsDisabled' in error_message:
+            logging.error(f'Comments are disabled for this video. Continuing function. Details: {error_message}')
+            proceed = True
+            status = 'success'
+        else:
+            error_retry_counters[parser_name] -= 1
+            if error_retry_counters[parser_name] <= 0:
+                status = 'Forbidden request'
+                short_message = 'Error: forbidden'
+                logging.error(f'Forbidden request. Terminating function after multiple retries. Details: {error_message}')
+                proceed = False
+            else:
+                logging.error(f'Forbidden request attempt {error_retry_counters[parser_name]}. Retrying... Details: {error_message}')
+                proceed = True
+    elif 'invalid_grant' in error_message:
         status = 'Invalid grant'
         short_message = 'Error: invalid_grant'
-        print('Invalid grant. Terminating function. Details:', str(error))
-        log_error_details(error)
+        logging.error(f'Invalid grant. Terminating function. Details: {error_message}')
         proceed = False
-    elif is_undefined_property_error(error):
-        print('Cannot read properties of undefined. Continuing function. Details:', str(error))
-        log_error_details(error)
+    elif 'Cannot read properties of undefined' in error_message:
+        logging.error(f'Cannot read properties of undefined. Continuing function. Details: {error_message}')
         proceed = True
     else:
-        short_message = f"Error: {error}"
-        log_error_details(error)
-        print(f"{parser_name}: Error: {error}")
-        logger.error(f"{parser_name}: Error: {error}")
+        short_message = f'Error: {error_message}'
+        logging.error(f'{parser_name}: Error: {error_message}')
         proceed = False
 
-    return {"status": 'success' if proceed else short_message, "proceed": proceed}
+    if proceed and error_retry_counters[parser_name] > 0:
+        try:
+            return func()
+        except Exception as retry_error:
+            return handle_parser_error(func, retry_error, parser_name, proceed, retries)
+    else:
+        error_retry_counters[parser_name] = retries  # Reset the counter if not proceeding
+
+    return {'status': status if not proceed else 'success', 'proceed': proceed}
 
 def is_rate_limit_error(error: Any) -> bool:
     return 'rate_limit' in str(error)

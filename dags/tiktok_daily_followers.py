@@ -16,10 +16,10 @@ def recalculate_tiktok_daily_followers(**kwargs: Dict[str, Any]) -> None:
     try:
         db = get_mongo_client()
         followers_stats_collection = db['tiktok_followers']
-        daily_followers_collection = db['tiktok_daily_followers_test']
+        daily_followers_collection = db['tiktok_daily_followers']
         posts_stats_collection = db['tiktok_daily_stats']
 
-        if 'tiktok_daily_followers_test' in db.list_collection_names():
+        if 'tiktok_daily_followers' in db.list_collection_names():
             daily_followers_collection.drop()
 
         followers_stats = list(followers_stats_collection.find().sort('recordCreated', 1))

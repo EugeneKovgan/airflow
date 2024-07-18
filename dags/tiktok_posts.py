@@ -1,10 +1,11 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
-# from pymongo import MongoClient
 import pendulum
-# import os
-from common.common_functions import close_mongo_connection, get_mongo_client, save_parser_history, handle_parser_error, log_parser_start, log_parser_finish, get_tikapi_client
+from common.common_functions import (
+    close_mongo_connection, get_mongo_client, save_parser_history,
+    handle_parser_error, log_parser_start, log_parser_finish, get_tikapi_client
+)
 from typing import Any, Dict
 
 def get_tiktok_posts_stats(**kwargs: Dict[str, Any]) -> None:
@@ -20,15 +21,15 @@ def get_tiktok_posts_stats(**kwargs: Dict[str, Any]) -> None:
 
     try:
         user = get_tikapi_client()
-        posts_collection = db['tiktok_posts_test']
-        posts_stats_collection = db['tiktok_posts_stats_test']
+        posts_collection = db['tiktok_posts']
+        posts_stats_collection = db['tiktok_posts_stats']
 
         i = 0
         size = 100
         while True:
-            ids = posts_collection.find({}, {"_id": 1}).skip(i * size).limit(size)
+            ids = list(posts_collection.find({}, {"_id": 1}).skip(i * size).limit(size))
             i += 1
-            if ids.count():
+            if ids:
                 for id in ids:
                     video_ids.add(str(id["_id"]))
             else:
@@ -43,70 +44,73 @@ def get_tiktok_posts_stats(**kwargs: Dict[str, Any]) -> None:
                     data = list_response.json()
                     break
                 except Exception as e:
+                    list_counter -= 1
                     result = handle_parser_error(e, parser_name, proceed)
                     proceed = result["proceed"]
-                    if not list_counter:
+                    if list_counter == 0:
                         status = result["status"]
                         raise e
-                    list_counter -= 1
 
             if not proceed or data is None:
                 break
 
             videos = data.get("itemList", [])
-            if videos:
-                for video in videos:
-                    if not video or not video.get("video"):
-                        print(f"Skipping video due to missing properties: {video}")
-                        continue
+            if not videos:
+                print("No videos found.")
+                break
 
-                    print(f"Processing video {video.get('desc')} (#{video.get('id')}) (video_duration - {video['video']['duration']}s)")
+            for video in videos:
+                if not video or not video.get("video"):
+                    print(f"Skipping video due to missing properties: {video}")
+                    continue
 
-                    if video.get("secret"):
-                        continue
+                print(f"Processing video {video.get('desc')} (#{video.get('id')}) (video_duration - {video['video']['duration']}s)")
 
-                    video_id = video["id"]
-                    if video_id not in video_ids:
-                        post = {
-                            "_id": video_id,
-                            "video": video,
-                            "recordCreated": pendulum.now(),
-                            "tags": None,
-                        }
-                        posts_collection.insert_one(post)
-                        print(f"New Video Discovered from {pendulum.from_timestamp(video['createTime'])} of {video['video']['duration']}s {video.get('desc')}")
-                    else:
-                        posts_collection.update_one(
-                            {"_id": video_id},
-                            {"$set": {"video": video, "recordCreated": pendulum.now()}}
-                        )
+                if video.get("secret"):
+                    continue
 
-                    counter_analytics = 3
-                    analytics = None
-                    while counter_analytics:
-                        try:
-                            analytics_response = user.analytics(type="video", media_id=video_id)
-                            analytics = analytics_response.json()
-                            break
-                        except Exception as e:
-                            result = handle_parser_error(e, parser_name, proceed)
-                            proceed = result["proceed"]
-                            if not counter_analytics:
-                                status = result["status"]
-                                raise e
-                            counter_analytics -= 1
-
-                    if not proceed:
-                        break
-
-                    posts_stats_collection.insert_one({
+                video_id = video["id"]
+                if video_id not in video_ids:
+                    post = {
+                        "_id": video_id,
+                        "video": video,
                         "recordCreated": pendulum.now(),
-                        "postId": video_id,
-                        "analytics": analytics,
-                    })
+                        "tags": None,
+                    }
+                    posts_collection.insert_one(post)
+                    print(f"New Video Discovered from {pendulum.from_timestamp(video['createTime'])} of {video['video']['duration']}s {video.get('desc')}")
+                else:
+                    posts_collection.update_one(
+                        {"_id": video_id},
+                        {"$set": {"video": video, "recordCreated": pendulum.now()}}
+                    )
 
-                proceed = data.get("hasMore", False)
-                cursor = data.get("cursor")
+                counter_analytics = 3
+                analytics = None
+                while counter_analytics:
+                    try:
+                        analytics_response = user.analytics(type="video", media_id=video_id)
+                        analytics = analytics_response.json()
+                        break
+                    except Exception as e:
+                        counter_analytics -= 1
+                        result = handle_parser_error(e, parser_name, proceed)
+                        proceed = result["proceed"]
+                        if counter_analytics == 0:
+                            status = result["status"]
+                            raise e
+
+                if not proceed:
+                    break
+
+                posts_stats_collection.insert_one({
+                    "recordCreated": pendulum.now(),
+                    "postId": video_id,
+                    "analytics": analytics,
+                })
+
+            proceed = data.get("hasMore", False)
+            cursor = data.get("cursor")
 
     except Exception as error:
         result = handle_parser_error(error, parser_name, proceed)
